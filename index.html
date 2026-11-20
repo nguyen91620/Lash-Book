@@ -32,18 +32,20 @@ label.chk{display:flex;gap:8px;align-items:center;margin:10px 0;font-weight:600}
 .mut{color:var(--mut);font-size:13px}
 </style></head><body>
 <h1>MY LASH BOOK</h1>
-<div class="tabs"><button id="t1" class="on">Bill</button><button id="t2">Daily report</button></div>
-<div id="v1"></div><div id="v2" hidden></div>
+<div class="tabs"><button id="t1" class="on">Bill</button><button id="t2">Daily report</button><button id="t3">Period</button></div>
+<div id="v1"></div><div id="v2" hidden></div><div id="v3" hidden></div>
 <script>
 const NEW={c:['Classic New Set',80,70],v:['Volume New Set',90,80],m:['Mega Volume New Set',100,90]};
 const FILL={c:[['Fill 1–7 Days',40,35],['Fill 8–14 Days',50,45],['Fill 15–21 Days',60,55],['Fill 22–28 Days',70,65]],
 m:[['Mega Fill 1–7 Days',45,40],['Mega Fill 8–14 Days',55,50],['Mega Fill 15–21 Days',65,60],['Mega Fill 22–28 Days',75,70]]};
 const EXTRA=[['Foreign Fill',65,65],['Lash Removal',20,20],['Eyebrow Wax',10,10],['Lip / Chin Wax',5,5]];
 const GN={c:'CLASSIC',v:'VOLUME / WISPY',m:'MEGA VOLUME / ANIME'};
-let grp='c',promo=false,name='',tip='',items=[],day=[],share=60,date=new Date().toISOString().slice(0,10);
-try{const s=JSON.parse(localStorage.getItem('lashbook')||'null');if(s){day=s.day||[];share=s.share??60;if(s.date===date){day=s.day||[];if(s.cur){items=s.cur.items||[];name=s.cur.name||'';tip=s.cur.tip||'';promo=!!s.cur.promo}}else day=[]}}catch(e){}
+let grp='c',promo=false,name='',tip='',items=[],day=[],share=60,date=(()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')})(),hist={},pm='',ph=1;
+try{hist=JSON.parse(localStorage.getItem('lashbook_hist')||'{}')}catch(e){}
+pm=date.slice(0,7);ph=+date.slice(8)>15?2:1;
+try{const s=JSON.parse(localStorage.getItem('lashbook')||'null');if(s){if(s.day&&s.day.length&&s.date&&!hist[s.date])hist[s.date]=s.day;day=s.day||[];share=s.share??60;if(s.date===date){day=s.day||[];if(s.cur){items=s.cur.items||[];name=s.cur.name||'';tip=s.cur.tip||'';promo=!!s.cur.promo}}else day=[]}}catch(e){}
 const nm=c=>/^(Customer|Client) \d+$/.test(c.name||'')?'':(c.name||'');
-const save=()=>{try{localStorage.setItem('lashbook',JSON.stringify({day,share,date,cur:{items,name,tip,promo}}))}catch(e){}};
+const save=()=>{try{if(day.length)hist[date]=day;else delete hist[date];localStorage.setItem('lashbook_hist',JSON.stringify(hist));localStorage.setItem('lashbook',JSON.stringify({day,share,date,cur:{items,name,tip,promo}}))}catch(e){}};
 const $=s=>document.querySelector(s),m=n=>'$'+(+n).toFixed(2).replace(/\.00$/,'');
 const price=(it)=>{const f=it.isNew&&it.promo?0.8:1;return Math.round((it.method==='cash'?it.cash:it.card)*f*100)/100};
 const gross=it=>it.cash;
@@ -87,6 +89,24 @@ document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)r
   else{const s=EXTRA[i];add(s[0],s[1],s[2],p,false)}}
  else if(b.dataset.d){items.splice(+b.dataset.d,1);render1()}
  else if(b.dataset.x){day.splice(+b.dataset.x,1);save();render1();render2()}});
+function calcOf(arr){const o=day;day=arr;const r=calc();day=o;return r}
+function periodInfo(){const [y,mo]=pm.split('-').map(Number);const last=new Date(y,mo,0).getDate();const a=ph===1?1:16,b=ph===1?15:last;
+ const keys=Object.keys(hist).filter(k=>k.slice(0,7)===pm&&+k.slice(8)>=a&&+k.slice(8)<=b).sort();
+ const all=[].concat(...keys.map(k=>hist[k]));const r=calcOf(all);
+ return{keys,all,r,label:new Date(y,mo-1,1).toLocaleDateString('en-US',{month:'long'})+' '+a+'–'+b+', '+y}}
+function periodText(){const p=periodInfo(),r=p.r;return ['MY LASH BOOK','PERIOD REPORT',p.label,'','Clients: '+p.all.length,'REVENUE (all payments): '+m(r.inn+r.card+r.zelle),'CASH: '+m(r.inn),'CARD: '+m(r.card),'ZELLE: '+m(r.zelle),'TIP: '+m(r.tips),'','CASH SUMMARY','TOTAL: '+m(r.tot),'IN: '+m(r.inn),'HẠNH: '+m(r.hanh),'NGUYÊN: '+m(r.ng)].join('\n')}
+function render3(){const p=periodInfo(),r=p.r;
+ const rows=p.keys.map(k=>{const q=calcOf(hist[k]);return `<tr><td>${k.slice(5)}</td><td>${hist[k].length}</td><td>${m(q.inn)}</td><td>${m(q.card+q.zelle)}</td><td>${m(q.tips)}</td></tr>`}).join('');
+ $('#v3').innerHTML=`<input type="month" id="pmn" value="${pm}">
+ <div class="grp" style="margin:10px 0"><button data-ph="1" class="${ph===1?'on':''}">1 – 15</button><button data-ph="2" class="${ph===2?'on':''}">16 – end of month</button></div>
+ <h2>${p.label.toUpperCase()}</h2>
+ <div class="sum"><div><b>CLIENTS</b><b>${p.all.length}</b></div><div><b>REVENUE (all payments)</b><b>${m(r.inn+r.card+r.zelle)}</b></div><div><span>CASH</span><span>${m(r.inn)}</span></div><div><span>CARD</span><span>${m(r.card)}</span></div><div><span>ZELLE</span><span>${m(r.zelle)}</span></div><div><span>TIP</span><span>${m(r.tips)}</span></div></div>
+ <h2>CASH SUMMARY</h2><div class="sum"><div><b>TOTAL</b><b>${m(r.tot)}</b></div><div><b>IN</b><b>${m(r.inn)}</b></div><div><b>HẠNH</b><b>${m(r.hanh)}</b></div><div><b>NGUYÊN</b><b>${m(r.ng)}</b></div></div>
+ <h2>BY DAY</h2><div class="tw"><table><tr><th>DATE</th><th>CLIENTS</th><th>CASH</th><th>CARD+ZELLE</th><th>TIP</th></tr>${rows||'<tr><td colspan="5" class="mut">No data in this period.</td></tr>'}</table></div>
+ <button class="big" id="pcp">Copy period summary</button>`;
+ $('#pmn').onchange=e=>{if(e.target.value){pm=e.target.value;render3()}};
+ document.querySelectorAll('[data-ph]').forEach(b=>b.onclick=()=>{ph=+b.dataset.ph;render3()});
+ $('#pcp').onclick=async()=>{try{await navigator.clipboard.writeText(periodText());flash('Copied')}catch(e){manual(periodText())}}}
 function calc(){let tot=0,inn=0,tips=0,card=0,zelle=0,disc=0;
  day.forEach(c=>{tips+=c.tip;c.items.forEach(it=>{const a=price(it);if(it.method==='cash'){tot+=gross(it);inn+=a;disc+=gross(it)-a}else if(it.method==='card')card+=a;else zelle+=a})});
  const ng=Math.round(inn*share)/100;return{tot,inn,tips,card,zelle,disc,ng,hanh:inn-ng}}
@@ -123,7 +143,7 @@ function render2(){const r=calc();const rows=[];
  $('#si').onclick=sendImg;$('#sd').onclick=sendSum;$('#cp').onclick=async()=>{try{await navigator.clipboard.writeText(report());flash('Copied')}catch(e){manual(report())}};
  $('#cl').onclick=function(){if(this.dataset.s){day=[];save();render1();render2()}else{this.dataset.s='1';this.textContent='Tap again to confirm clear';setTimeout(()=>{this.dataset.s='';this.textContent='Clear today’s data'},3000)}}}
 function commit(){if(!items.length)return false;day.push({name:name,items:items.slice(),tip:+tip||0,time:new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})});items=[];name='';tip='';save();return true}
-function tab(n){$('#v1').hidden=n!==1;$('#v2').hidden=n!==2;$('#t1').classList.toggle('on',n===1);$('#t2').classList.toggle('on',n===2);if(n===2){if(commit())render1();render2()}}
-$('#t1').onclick=()=>tab(1);$('#t2').onclick=()=>tab(2);
+function tab(n){[1,2,3].forEach(i=>{$('#v'+i).hidden=n!==i;$('#t'+i).classList.toggle('on',n===i)});if(n>1&&commit())render1();if(n===2)render2();if(n===3)render3()}
+$('#t1').onclick=()=>tab(1);$('#t2').onclick=()=>tab(2);$('#t3').onclick=()=>tab(3);
 render1();render2();
 </script></body></html>
